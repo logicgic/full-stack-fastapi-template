@@ -19,6 +19,7 @@ def read_items(
     """
 
     if current_user.is_superuser:
+        # 管理员可以查看全量条目。
         count_statement = select(func.count()).select_from(Item)
         count = session.exec(count_statement).one()
         statement = (
@@ -26,6 +27,7 @@ def read_items(
         )
         items = session.exec(statement).all()
     else:
+        # 普通用户只能查看自己的条目。
         count_statement = (
             select(func.count())
             .select_from(Item)
@@ -65,6 +67,7 @@ def create_item(
     """
     Create new item.
     """
+    # owner_id 永远取当前登录用户，而不是信任客户端传值。
     item = Item.model_validate(item_in, update={"owner_id": current_user.id})
     session.add(item)
     session.commit()
@@ -89,6 +92,7 @@ def update_item(
     if not current_user.is_superuser and (item.owner_id != current_user.id):
         raise HTTPException(status_code=403, detail="Not enough permissions")
     update_dict = item_in.model_dump(exclude_unset=True)
+    # 只覆盖用户本次提交的字段，未提交字段保持原值。
     item.sqlmodel_update(update_dict)
     session.add(item)
     session.commit()

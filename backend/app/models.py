@@ -7,11 +7,13 @@ from sqlmodel import Field, Relationship, SQLModel
 
 
 def get_datetime_utc() -> datetime:
+    # 数据库时间统一使用 UTC，避免跨时区部署时产生歧义。
     return datetime.now(UTC)
 
 
 # Shared properties
 class UserBase(SQLModel):
+    # 用户相关模型的公共字段，创建、更新和返回模型都会复用。
     email: EmailStr = Field(unique=True, index=True, max_length=255)
     is_active: bool = True
     is_superuser: bool = False
@@ -20,6 +22,7 @@ class UserBase(SQLModel):
 
 # Properties to receive via API on creation
 class UserCreate(UserBase):
+    # 创建用户时接收明文密码，入库前会转换成 hashed_password。
     password: str = Field(min_length=8, max_length=128)
 
 
@@ -50,6 +53,7 @@ class UpdatePassword(SQLModel):
 
 # Database model, database table inferred from class name
 class User(UserBase, table=True):
+    # table=True 表示这是实际映射到数据库表的 SQLModel 模型。
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     hashed_password: str
     created_at: datetime | None = Field(
@@ -66,12 +70,14 @@ class UserPublic(UserBase):
 
 
 class UsersPublic(SQLModel):
+    # 列表接口统一返回数据和总数，方便前端分页。
     data: list[UserPublic]
     count: int
 
 
 # Shared properties
 class ItemBase(SQLModel):
+    # Item 相关模型的公共字段。
     title: str = Field(min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=255)
 
@@ -89,6 +95,7 @@ class ItemUpdate(SQLModel):
 
 # Database model, database table inferred from class name
 class Item(ItemBase, table=True):
+    # Item 通过 owner_id 归属到用户，用户删除时级联删除其条目。
     id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
     created_at: datetime | None = Field(
         default_factory=get_datetime_utc,
@@ -108,6 +115,7 @@ class ItemPublic(ItemBase):
 
 
 class ItemsPublic(SQLModel):
+    # 列表接口统一返回数据和总数，方便前端分页。
     data: list[ItemPublic]
     count: int
 

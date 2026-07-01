@@ -14,11 +14,13 @@ from app.core.db import engine
 from app.models import TokenPayload, User
 
 reusable_oauth2 = OAuth2PasswordBearer(
+    # 这里声明登录接口地址，Swagger 和 OAuth2 流程会用到它。
     tokenUrl=f"{settings.API_V1_STR}/login/access-token"
 )
 
 
 def get_db() -> Generator[Session]:
+    # 每个请求获取一个数据库会话，请求结束后自动关闭。
     with Session(engine) as session:
         yield session
 
@@ -28,6 +30,7 @@ TokenDep = Annotated[str, Depends(reusable_oauth2)]
 
 
 def get_current_user(session: SessionDep, token: TokenDep) -> User:
+    # 从 Bearer Token 中解析出当前登录用户。
     try:
         payload = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
@@ -50,6 +53,7 @@ CurrentUser = Annotated[User, Depends(get_current_user)]
 
 
 def get_current_active_superuser(current_user: CurrentUser) -> User:
+    # 需要管理员权限的接口统一复用这个依赖。
     if not current_user.is_superuser:
         raise HTTPException(
             status_code=403, detail="The user doesn't have enough privileges"

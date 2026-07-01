@@ -18,11 +18,13 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class EmailData:
+    # 邮件主题和 HTML 正文统一通过这个结构传递。
     html_content: str
     subject: str
 
 
 def render_email_template(*, template_name: str, context: dict[str, Any]) -> str:
+    # 读取已构建好的 HTML 模板并注入变量。
     template_str = (
         Path(__file__).parent / "email-templates" / "build" / template_name
     ).read_text()
@@ -36,6 +38,7 @@ def send_email(
     subject: str = "",
     html_content: str = "",
 ) -> None:
+    # 邮件发送参数完全来自 settings，避免在业务代码里散落 SMTP 配置。
     assert settings.emails_enabled, "no provided configuration for email variables"
     message = emails.Message(
         subject=subject,
@@ -56,6 +59,7 @@ def send_email(
 
 
 def generate_test_email(email_to: str) -> EmailData:
+    # 生成测试邮件内容，用于验证 SMTP 配置是否可用。
     project_name = settings.PROJECT_NAME
     subject = f"{project_name} - Test email"
     html_content = render_email_template(
@@ -66,6 +70,7 @@ def generate_test_email(email_to: str) -> EmailData:
 
 
 def generate_reset_password_email(email_to: str, email: str, token: str) -> EmailData:
+    # 重置密码邮件里拼出前端重置页面链接，由前端页面继续完成密码提交。
     project_name = settings.PROJECT_NAME
     subject = f"{project_name} - Password recovery for user {email}"
     link = f"{settings.FRONTEND_HOST}/reset-password?token={token}"
@@ -85,6 +90,7 @@ def generate_reset_password_email(email_to: str, email: str, token: str) -> Emai
 def generate_new_account_email(
     email_to: str, username: str, password: str
 ) -> EmailData:
+    # 新账号通知邮件通常在管理员创建用户后发送。
     project_name = settings.PROJECT_NAME
     subject = f"{project_name} - New account for user {username}"
     html_content = render_email_template(
@@ -101,6 +107,7 @@ def generate_new_account_email(
 
 
 def generate_password_reset_token(email: str) -> str:
+    # 重置密码令牌本质上也是一个短时效 JWT。
     delta = timedelta(hours=settings.EMAIL_RESET_TOKEN_EXPIRE_HOURS)
     now = datetime.now(UTC)
     expires = now + delta
@@ -114,6 +121,7 @@ def generate_password_reset_token(email: str) -> str:
 
 
 def verify_password_reset_token(token: str) -> str | None:
+    # 校验失败时返回 None，由上层统一处理为无效令牌。
     try:
         decoded_token = jwt.decode(
             token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]

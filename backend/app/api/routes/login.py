@@ -27,6 +27,7 @@ def login_access_token(
     """
     OAuth2 compatible token login, get an access token for future requests
     """
+    # OAuth2PasswordRequestForm 会把用户名字段映射为 username，这里实际使用邮箱登录。
     user = crud.authenticate(
         session=session, email=form_data.username, password=form_data.password
     )
@@ -35,6 +36,7 @@ def login_access_token(
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+    # 登录成功后签发访问令牌，后续请求通过 Authorization: Bearer <token> 携带。
     return Token(
         access_token=security.create_access_token(
             user.id, expires_delta=access_token_expires
@@ -60,6 +62,7 @@ def recover_password(email: str, session: SessionDep) -> Message:
     # Always return the same response to prevent email enumeration attacks
     # Only send email if user actually exists
     if user:
+        # 仅在用户存在时发送重置邮件，但对外不暴露用户是否存在。
         password_reset_token = generate_password_reset_token(email=email)
         email_data = generate_reset_password_email(
             email_to=user.email, email=email, token=password_reset_token
@@ -89,6 +92,7 @@ def reset_password(session: SessionDep, body: NewPassword) -> Message:
     elif not user.is_active:
         raise HTTPException(status_code=400, detail="Inactive user")
     user_in_update = UserUpdate(password=body.new_password)
+    # 密码更新逻辑复用 CRUD 层，保证哈希处理一致。
     crud.update_user(
         session=session,
         db_user=user,

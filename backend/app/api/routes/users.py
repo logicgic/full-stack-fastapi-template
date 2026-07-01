@@ -39,6 +39,7 @@ def read_users(session: SessionDep, skip: int = 0, limit: int = 100) -> Any:
     Retrieve users.
     """
 
+    # 管理员查看用户列表时，同时返回总数供前端分页使用。
     count_statement = select(func.count()).select_from(User)
     count = session.exec(count_statement).one()
 
@@ -67,6 +68,7 @@ def create_user(*, session: SessionDep, user_in: UserCreate) -> Any:
 
     user = crud.create_user(session=session, user_create=user_in)
     if settings.emails_enabled and user_in.email:
+        # 邮件功能启用时，给新用户发送初始账号信息。
         email_data = generate_new_account_email(
             email_to=user_in.email, username=user_in.email, password=user_in.password
         )
@@ -87,6 +89,7 @@ def update_user_me(
     """
 
     if user_in.email:
+        # 修改邮箱前先校验唯一性，避免和其他账号冲突。
         existing_user = crud.get_user_by_email(session=session, email=user_in.email)
         if existing_user and existing_user.id != current_user.id:
             raise HTTPException(
@@ -135,6 +138,7 @@ def delete_user_me(session: SessionDep, current_user: CurrentUser) -> Any:
     Delete own user.
     """
     if current_user.is_superuser:
+        # 避免系统最后一个管理员误删自己导致后台失管。
         raise HTTPException(
             status_code=403, detail="Super users are not allowed to delete themselves"
         )
@@ -155,6 +159,7 @@ def register_user(session: SessionDep, user_in: UserRegister) -> Any:
             detail="The user with this email already exists in the system",
         )
     user_create = UserCreate.model_validate(user_in)
+    # 公开注册接口复用管理员创建用户的同一套数据模型。
     user = crud.create_user(session=session, user_create=user_create)
     return user
 
@@ -168,6 +173,7 @@ def read_user_by_id(
     """
     user = session.get(User, user_id)
     if user == current_user:
+        # 普通用户允许直接读取自己的资料。
         return user
     if not current_user.is_superuser:
         raise HTTPException(
@@ -225,6 +231,7 @@ def delete_user(
         raise HTTPException(
             status_code=403, detail="Super users are not allowed to delete themselves"
         )
+    # 这里显式删除 Item，和关系级联删除保持一致，避免遗留孤儿数据。
     statement = delete(Item).where(col(Item.owner_id) == user_id)
     session.exec(statement)
     session.delete(user)
